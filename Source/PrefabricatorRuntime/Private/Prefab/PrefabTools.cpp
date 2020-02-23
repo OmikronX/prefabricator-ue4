@@ -371,6 +371,7 @@ namespace {
 		}
 
 		UPrefabricatorAsset* PrefabAsset = Cast<UPrefabricatorAsset>(PrefabActor->PrefabComponent->PrefabAssetInterface.LoadSynchronous());
+		USceneComponent* SceneComponent = Cast<USceneComponent>(ObjToSerialize);
 
 		if (!PrefabAsset) {
 			return;
@@ -505,9 +506,10 @@ void FPrefabTools::SaveActorState(AActor* InActor, APrefabActor* PrefabActor, FP
 		int32 ComponentDataIdx = OutActorData.Components.AddDefaulted();
 		FPrefabricatorComponentData& ComponentData = OutActorData.Components[ComponentDataIdx];
 		ComponentData.ComponentName = Component->GetPathName(InActor);
-		// JB: As far as I can tell ComponentData.RelativeTransform is never used - you may consider removing it to save some disk space.
+		// JB: We now correctly compute the component relative transform.
+		// JB: This is used to correct the location of objects simulating physics that are spawned at runtime.
 		if (USceneComponent* SceneComponent = Cast<USceneComponent>(Component)) {
-			ComponentData.RelativeTransform = SceneComponent->GetComponentTransform();
+			ComponentData.RelativeTransform = SceneComponent->GetComponentTransform() * InversePrefabTransform;
 		}
 		else {
 			ComponentData.RelativeTransform = FTransform::Identity;
@@ -541,16 +543,24 @@ void FPrefabTools::LoadActorState(AActor* InActor, const FPrefabricatorActorData
 		ComponentsByName.Add(ComponentPath, Component);
 	}
 
+	
 	{
+		TArray<UActorComponent*> ComponentsToInitialize;
 		for (const FPrefabricatorComponentData& ComponentData : InActorData.Components) {
 			if (UActorComponent** SearchResult = ComponentsByName.Find(ComponentData.ComponentName)) {
 				UActorComponent* Component = *SearchResult;
+				USceneComponent* SceneComponent = Cast<USceneComponent>(Component);
+
 				bool bPreviouslyRegister;
 				{
 					//SCOPE_CYCLE_COUNTER(STAT_LoadStateFromPrefabAsset_UnregisterComponent);
 					bPreviouslyRegister = Component->IsRegistered();
 					if (InSettings.bUnregisterComponentsBeforeLoading && bPreviouslyRegister) {
 						Component->UnregisterComponent();
+						// JB: Some of the components (e.g., UPhysicsConstraintComponent) also require re-initialization.
+						if (Component->HasBeenInitialized()) {
+							Component->UninitializeComponent();
+						}
 					}
 				}
 
@@ -562,10 +572,31 @@ void FPrefabTools::LoadActorState(AActor* InActor, const FPrefabricatorActorData
 				{
 					//SCOPE_CYCLE_COUNTER(STAT_LoadStateFromPrefabAsset_RegisterComponent);
 					if (InSettings.bUnregisterComponentsBeforeLoading && bPreviouslyRegister) {
+						// JB: RegisterComponent method would also initialize component.
+						// JB: However, we need to do it manually after all components are registered.
+						if(Component->bWantsInitializeComponent)
+						{
+							Component->bWantsInitializeComponent = false;
+							ComponentsToInitialize.Add(Component);
+						}
+						
 						Component->RegisterComponent();
+						// JB: Components that are simulating physics are detached from the actor on register.
+						// JB: Restoring their relative location above will cause them to be spawned at a wrong location so we fix it.
+						// JB: This is necessary only for prefab spawned at runtime.
+						if (InActor->HasActorBegunPlay() && SceneComponent->IsSimulatingPhysics()) {
+							SceneComponent->SetRelativeTransform(ComponentData.RelativeTransform);
+						}
 					}
 				}
 			}
+		}
+
+		// JB: Restores the bWantsInitializeComponent flag and initialize all components that requires initialization.
+		for(UActorComponent* Component :  ComponentsToInitialize)
+		{
+			Component->bWantsInitializeComponent = true;
+			Component->InitializeComponent();
 		}
 	}
 
@@ -719,7 +750,8 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 				}
 
 				//JB: Spawning actors on top of each other may cause problems with PhysicX (as it needs to compute the overlaps).
-				ChildActor = Service->SpawnActor(ActorClass, PrefabActor->GetActorTransform(), PrefabActor->GetLevel(), Template);
+				FTransform WorldTransform = ActorItemData.RelativeTransform * PrefabActor->GetTransform();
+				ChildActor = Service->SpawnActor(ActorClass, WorldTransform, PrefabActor->GetLevel(), Template);
 			}
 		}
 		else {
