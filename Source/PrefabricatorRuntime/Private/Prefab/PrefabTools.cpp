@@ -490,6 +490,7 @@ namespace {
 		// JB: Restoring the relative location will essentially put all spawned actors on top of each other even if the prefabs are spawned at different places.
 		// JB: In such a case, the physics has to deal with the overlaps (or at least I think so) and significantly slows down.
 		// JB: Especially if the assets have a large number of collisions.
+		// JB: It also causes some problems when the actors contains UPhysicsConstraintComponents.
 		USceneComponent* SceneComponent = Cast<USceneComponent>(ObjToSerialize);
 		if(SceneComponent && Cast<UPrefabComponent>(SceneComponent->GetAttachParent()))
 		{
@@ -678,7 +679,7 @@ void FPrefabTools::SaveActorState(AActor* InActor, APrefabActor* PrefabActor, FP
 	//DumpSerializedData(OutActorData);
 }
 
-void FPrefabTools::LoadActorState(AActor* InActor, const FPrefabricatorActorData& InActorData, const FPrefabLoadSettings& InSettings, const TMap<FGuid, AActor*>& InChildActors)
+void FPrefabTools::LoadActorState(AActor* InActor, const FPrefabricatorActorData& InActorData, const FPrefabLoadSettings& InSettings, const TMap<FGuid, AActor*>& InChildActors, const APrefabActor* PrefabActor)
 {
 	if (!InActor) {
 		return;
@@ -739,12 +740,14 @@ void FPrefabTools::LoadActorState(AActor* InActor, const FPrefabricatorActorData
 						}
 						
 						Component->RegisterComponent();
+						
 						// JB: Components that are simulating physics are detached from the actor on register.
 						// JB: Restoring their relative location above will cause them to be spawned at a wrong location so we fix it.
 						// JB: This is necessary only for prefab spawned at runtime.
 						if (InActor->HasActorBegunPlay() && SceneComponent->IsSimulatingPhysics()) {
-							SceneComponent->SetRelativeTransform(ComponentData.RelativeTransform);
+							SceneComponent->SetRelativeTransform(ComponentData.RelativeTransform * PrefabActor->GetTransform());
 						}
+
 					}
 				}
 			}
@@ -935,7 +938,7 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 		AActor* Template = Templates[SpawnedActorElement.Key];
 
 		if (!Template) {
-			LoadActorState(ChildActor, ActorItemData, InSettings, ChildActors);
+			LoadActorState(ChildActor, ActorItemData, InSettings, ChildActors, PrefabActor);
 			if (InState.IsValid()) {
 				InState->PrefabItemTemplates.Add(ActorItemData.PrefabItemID, ChildActor);
 				InState->_Stat_SlowSpawns++;
