@@ -949,6 +949,7 @@ void FPrefabTools::LoadStateFromPrefabAsset(APrefabActor* PrefabActor, const FPr
 				InState->_Stat_FastSpawns++;
 			}
 		}
+		PrefabActor->SpawnedActors.Add(ChildActor); //TODO: Consider when to clear this array.
 		ParentActors(PrefabActor, ChildActor);
 		AssignAssetUserData(ChildActor, ActorItemData.PrefabItemID, PrefabActor);
 

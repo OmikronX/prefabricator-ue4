@@ -2,8 +2,8 @@
 
 #pragma once
 #include "CoreMinimal.h"
-#include "Engine/AssetUserData.h"
 #include "GameFramework/Actor.h"
+#include "PrefabricatorAsset.h"
 #include "PrefabActor.generated.h"
 
 UCLASS(Blueprintable, ConversionRoot, ComponentWrapperClass)
@@ -12,6 +12,12 @@ class PREFABRICATORRUNTIME_API APrefabActor : public AActor {
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (ExposeFunctionCategories = "Prefabricator,Mobility", AllowPrivateAccess = "true"))
 	class UPrefabComponent* PrefabComponent;
+
+	/* 
+	 * JB: The list of actors spawned by this prefab actor. 
+	 * JB: We need a custom list as some of the actors may be detached during the gameplay (e.g., when simulating physics).
+	 */
+	TArray<AActor*> SpawnedActors;
 
 public:
 	/// AActor Interface 
@@ -43,8 +49,8 @@ public:
 	void HandleBuildComplete();
 
 public:
-	// The last update ID of the prefab asset when this actor was refreshed from it
-	// This is used to test if the prefab has changed since we last recreated it
+	// The last update ID of the prefab asset when this actor was refreshed from it.
+	// This is used to test if the prefab has changed since we last recreated it.
 	UPROPERTY()
 	FGuid LastUpdateID;
 

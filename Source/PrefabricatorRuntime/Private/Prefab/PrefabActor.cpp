@@ -47,15 +47,29 @@ void APrefabActor::Destroyed()
 {
 	Super::Destroyed();
 
-	// Destroy all attached actors
+	// JB: The new version of destroy using the array of spawned actors.
+	// JB: This should take care of cases when the actors is detached from the prefab during the gameplay.
+	for(AActor* SpawnedActor : SpawnedActors)
 	{
+		if(SpawnedActor)
+		{
+			TSet<AActor*> Visited;
+			// JB: Using the original method just in case
+			DestroyAttachedActorsRecursive(SpawnedActor, Visited);
+			check(Visited.Num() == 1) // TODO if this happens in future investigate the case and adjust the SpawnedActors accordingly.
+		}
+	}
+
+	// JB: Below is the older version from coderespawn
+	// Destroy all attached actors
+	/*{
 		TSet<AActor*> Visited;
 		TArray<AActor*> AttachedActors;
 		GetAttachedActors(AttachedActors);
 		for (AActor* AttachedActor : AttachedActors) {
 			DestroyAttachedActorsRecursive(AttachedActor, Visited);
 		}
-	}
+	}*/
 }
 
 void APrefabActor::PostLoad()
