@@ -9,7 +9,7 @@
 
 #include "Engine/Engine.h"
 
-APrefabActor* UPrefabricatorBlueprintLibrary::SpawnPrefab(const UObject* WorldContextObject, UPrefabricatorAssetInterface* Prefab, const FTransform& Transform, int32 Seed)
+APrefabActor* UPrefabricatorBlueprintLibrary::SpawnPrefab(const UObject* WorldContextObject, const UPrefabricatorAssetInterface* Prefab, const FTransform& Transform, int32 Seed)
 {
 	APrefabActor* PrefabActor = nullptr;
 	UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull);

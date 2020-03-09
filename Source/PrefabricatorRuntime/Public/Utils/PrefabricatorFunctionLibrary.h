@@ -15,7 +15,7 @@ class PREFABRICATORRUNTIME_API UPrefabricatorBlueprintLibrary : public UBlueprin
 	GENERATED_BODY()
 public:
 	UFUNCTION(BlueprintCallable, Category = "Prefabricator")
-	static APrefabActor* SpawnPrefab(const UObject* WorldContextObject, UPrefabricatorAssetInterface* Prefab, const FTransform& Transform, int32 Seed);
+	static APrefabActor* SpawnPrefab(const UObject* WorldContextObject, const UPrefabricatorAssetInterface* Prefab, const FTransform& Transform, int32 Seed);
 
 	UFUNCTION(BlueprintCallable, Category = "Prefabricator")
 	static void RandomizePrefab(APrefabActor* PrefabActor, const FRandomStream& InRandom);
